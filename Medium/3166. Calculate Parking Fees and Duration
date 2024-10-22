@@ -1,0 +1,71 @@
+## 3166. Calculate Parking Fees and Duration
+
+The table name is ParkingTransactions and it has five columns
++--------------+-----------+
+| Column Name  | Type      |
++--------------+-----------+
+| lot_id       | int       |
+| car_id       | int       |
+| entry_time   | datetime  |
+| exit_time    | datetime  |
+| fee_paid     | decimal   |
++--------------+-----------+
+
+(lot_id, car_id, entry_time) is the primary key (combination of columns with unique values) for this table.
+Each row of this table contains the ID of the parking lot, the ID of the car, the entry and exit times, and the fee paid for the parking duration.
+Write a solution to find the total parking fee paid by each car across all parking lots, and the average hourly fee (rounded to 2 decimal places) paid by each car. Also, find the parking lot where each car spent the most total time.
+
+Return the result table ordered by car_id in ascending order.
+
+Note: Test cases are generated in such a way that an individual car cannot be in multiple parking lots at the same time.
+
+Solution:
+
+WITH lot_most_time AS (
+    SELECT 
+        car_id, 
+        lot_id, 
+        SUM(TIMESTAMPDIFF(MINUTE, entry_time, exit_time)) AS total_time  # remember to change time format
+    FROM 
+        ParkingTransactions
+    GROUP BY 
+        car_id, lot_id # cannot only group by car_id
+),
+
+car_most_time AS (
+    SELECT 
+        car_id, 
+        lot_id AS most_time_lot
+    FROM (
+        SELECT 
+            car_id, 
+            lot_id, 
+            total_time,
+            RANK() OVER (PARTITION BY car_id ORDER BY total_time DESC) AS time_rank
+        FROM 
+            lot_most_time
+    ) AS ranked_lots
+    WHERE 
+        time_rank = 1
+),
+total_parking_fee AS (
+    SELECT 
+        car_id, 
+        SUM(fee_paid) AS total_fee_paid,
+        ROUND(SUM(fee_paid) / (SUM(TIMESTAMPDIFF(MINUTE, entry_time, exit_time)) / 60), 2) AS avg_hourly_fee
+    FROM 
+        ParkingTransactions
+    GROUP BY 
+        car_id
+)
+SELECT 
+    tpf.car_id, 
+    tpf.total_fee_paid, 
+    tpf.avg_hourly_fee, 
+    cmt.most_time_lot
+FROM 
+    total_parking_fee tpf
+JOIN 
+    car_most_time cmt ON tpf.car_id = cmt.car_id
+ORDER BY 
+    tpf.car_id ASC;
