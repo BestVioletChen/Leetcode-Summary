@@ -1,0 +1,131 @@
+Table: Posts
+
++-------------+---------+
+| Column Name | Type    |
++-------------+---------+
+| post_id     | int     |
+| user_id     | int     |
+| post_date   | date    |
++-------------+---------+
+post_id is the primary key (column with unique values) for this table.
+Each row of this table contains post_id, user_id, and post_date.
+Write a solution to find users who demonstrate bursty behavior in their posting patterns during February 2024. Bursty behavior is defined as any period of 7 consecutive days where a user's posting frequency is at least twice to their average weekly posting frequency for February 2024.
+
+Note: Only include the dates from February 1 to February 28 in your analysis, which means you should count February as having exactly 4 weeks.
+Return the result table orderd by user_id in ascending order.
+
+The result format is in the following example.
+
+Example:
+
+Input:
+
+Posts table:
+
++---------+---------+------------+
+| post_id | user_id | post_date  |
++---------+---------+------------+
+| 1       | 1       | 2024-02-27 |
+| 2       | 5       | 2024-02-06 |
+| 3       | 3       | 2024-02-25 |
+| 4       | 3       | 2024-02-14 |
+| 5       | 3       | 2024-02-06 |
+| 6       | 2       | 2024-02-25 |
++---------+---------+------------+
+
+Output:
++---------+----------------+------------------+
+| user_id | max_7day_posts | avg_weekly_posts |
++---------+----------------+------------------+
+| 1       | 1              | 0.2500           |
+| 2       | 1              | 0.2500           |
+| 5       | 1              | 0.2500           |
++---------+----------------+------------------+
+
+
+## Solution:
+
+# Write your MySQL query statement below
+
+-- Filter posts only in February 2024
+WITH feb_post AS (
+    SELECT 
+        user_id,
+        DATE(post_date) AS post_date  # remember to keep date format
+    FROM 
+        Posts
+    WHERE 
+        post_date BETWEEN '2024-02-01' AND '2024-02-28'
+),
+
+-- Calculate the average weekly posting frequency for each user
+weekly_average_post AS ( 
+    SELECT 
+        user_id,
+        COUNT(*) / 4.0 AS avg_weekly_posts
+    FROM 
+        feb_post
+    GROUP BY 
+        user_id
+),
+
+-- Count the number of posts per day for each user
+daily_frequency AS (
+    SELECT 
+        user_id,
+        post_date,
+        COUNT(*) AS daily_post
+    FROM 
+        feb_post
+    GROUP BY 
+        user_id, post_date
+),
+
+-- Calculate the total posts in a 7-day sliding window
+sliding_7day_window AS (
+    SELECT 
+        df1.user_id,
+        SUM(df2.daily_post) AS total_7day_posts
+    FROM 
+        daily_frequency df1
+    JOIN 
+        daily_frequency df2 
+        ON df1.user_id = df2.user_id
+        AND df2.post_date BETWEEN df1.post_date AND df1.post_date + INTERVAL 6 DAY
+    GROUP BY 
+        df1.user_id, df1.post_date
+),
+
+-- Find the maximum 7-day post count for each user
+max_7day_posts_per_user AS (
+    SELECT 
+        s7.user_id,
+        MAX(s7.total_7day_posts) AS max_7day_posts, # find the maximum post # of each user in any 7 consecutive days.
+        wap.avg_weekly_posts
+    FROM 
+        sliding_7day_window s7
+    JOIN 
+        weekly_average_post wap 
+        ON s7.user_id = wap.user_id
+    GROUP BY 
+        s7.user_id
+)
+SELECT 
+    user_id,
+    max_7day_posts,
+    ROUND(avg_weekly_posts, 4) AS avg_weekly_posts
+FROM 
+    max_7day_posts_per_user
+WHERE 
+    max_7day_posts >= 2 * avg_weekly_posts
+ORDER BY 
+    user_id ASC;
+
+
+
+
+
+
+
+
+
