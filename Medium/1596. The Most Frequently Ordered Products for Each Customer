@@ -1,0 +1,76 @@
+Table: Customers
+
++---------------+---------+
+| Column Name   | Type    |
++---------------+---------+
+| customer_id   | int     |
+| name          | varchar |
++---------------+---------+
+customer_id is the column with unique values for this table.
+This table contains information about the customers.
+ 
+
+Table: Orders
+
++---------------+---------+
+| Column Name   | Type    |
++---------------+---------+
+| order_id      | int     |
+| order_date    | date    |
+| customer_id   | int     |
+| product_id    | int     |
++---------------+---------+
+order_id is the column with unique values for this table.
+This table contains information about the orders made by customer_id.
+No customer will order the same product more than once in a single day.
+ 
+
+Table: Products
+
++---------------+---------+
+| Column Name   | Type    |
++---------------+---------+
+| product_id    | int     |
+| product_name  | varchar |
+| price         | int     |
++---------------+---------+
+product_id is the column with unique values for this table.
+This table contains information about the products.
+ 
+
+Write a solution to find the most frequently ordered product(s) for each customer.
+The result table should have the product_id and product_name for each customer_id who ordered at least one order.
+
+Return the result table in any order. The result format is in the following example.
+
+# calculate order_number for each product of each customer
+WITH order_number AS(
+    SELECT c.customer_id,
+       o.product_id,
+       count(o.order_id) AS order_number
+    FROM Customers c
+    LEFT JOIN Orders o ON c.customer_id = o.customer_id
+    LEFT JOIN Products p ON p.product_id = o.product_id
+    WHERE o.order_id IS NOT NULL AND p.product_id IS NOT NULL
+    GROUP BY c.customer_id, o.product_id
+),
+
+# find order_rank for each customer
+order_rank AS(
+    SELECT customer_id,
+       product_id,
+       order_number,
+       dense_rank() OVER(Partition by customer_id Order by order_number DESC) as order_rank
+    FROM order_number
+)
+
+SELECT cte.customer_id,
+       cte.product_id,
+       p.product_name
+FROM order_rank cte
+LEFT JOIN Products p ON cte.product_id = p.product_id
+WHERE cte.order_rank = 1
+ORDER BY 1 ASC;
+
+
+
